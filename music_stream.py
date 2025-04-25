@@ -28,5 +28,10 @@ def select_song(sentiment):
 
 
 
+
+
 if __name__ == "__main__":
-    select_song("tense")
+    sentiments = ["driven","eerie","ethereal","melancholy","mysterious","neutral","tense","triumphant","upbeat"]
+    chosen_sentiment = random.choice(sentiments)
+    print(chosen_sentiment)
+    select_song(chosen_sentiment)
