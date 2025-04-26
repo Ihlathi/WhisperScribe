@@ -1,4 +1,5 @@
 from flask import Flask, request
+from PIL import Image as image
 
 app = Flask(__name__)
 
@@ -15,8 +16,6 @@ def upload():
     
     with open("image.jpg", 'wb') as file:
         file.write(data) # after opening file as w (write) b (binary), write the file
-
-    main.do_thing()
 
     return "Success", 200 # return 200 for success
 

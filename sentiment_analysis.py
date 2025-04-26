@@ -22,14 +22,14 @@ def analyse_text(book_snippet):
             7. eerie
             8. driven
             9. neutral (this one should be playing most of the time unless there is something notable)
-         - intensity is how loud the music is... how intensely the music fits the scene. Be conservative. Notably you may choose to use lower intensity in certain intense situations depending on the context (such as quieter sadness vs great weeping) even if the scene fully embodies the sentiment. This data should be between 0 (silent) and 10 (blasting).
+         - intensity is how loud the music is... how intensely the music fits the scene. Be conservative. Notably you may choose to use lower intensity in certain intense situations depending on the context (such as quieter sadness vs great weeping) even if the scene fully embodies the sentiment. This data should be between 0 (silent) and 10 (blasting). 5 is default.
          - order your responses in the order they occur in the text: first occurrance comes first... else it will not work
-         - be reasonable about your music changes. You don't want to disturb the reader, instead provide them with a nice ambient reading experience. If there is nothing notable happening, revert to neutral with an appropriate intensity (could be 5)
+         - be quite sparse about your music changes. You don't want to disturb the reader, instead provide them with a nice ambient reading experience. If there is nothing notable happening, revert to neutral with an appropriate intensity (could be 5)
          """},
         {"role": "user", "content": f"Based on the following text, suggest music that matches the tone and atmosphere: {book_snippet}"}
     ]
 
-    character_schema = {
+    sentiment_schema = {
         "type": "json_schema",
         "json_schema": {
             "name": "music changes",
@@ -58,12 +58,17 @@ def analyse_text(book_snippet):
     response = client.chat.completions.create(
         model="meta-llama-3.1-8b-instruct",
         messages=messages,
-        response_format=character_schema,
+        response_format=sentiment_schema,
     )
 
     results = json.loads(response.choices[0].message.content)
-    print(json.dumps(results, indent=2))
 
+    parsed_results = [(change["trigger string"], change["sentiment"], change["strength"]) for change in results["changes"]]
+
+    print(json.dumps(results, indent=2))
+    print(parsed_results)
+
+    return parsed_results
 
 if __name__ == "__main__":
     print("hi")
