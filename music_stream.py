@@ -22,6 +22,7 @@ def select_song(sentiment, current_song = None):
 
     song_name = random.choice(song_options)
     song_path = os.path.join(folder_path, song_name)
+    print("song selected: " + song_path + song_name)
     return song_path, song_name
 
 def start_music():
@@ -36,6 +37,7 @@ def start_music():
 
     next_song_path, _ = select_song("neutral", os.path.basename(song_path))
     pygame.mixer.music.queue(next_song_path)
+    print("music started")
 
 def change(sentiment, intensity):
     global current_song_name, current_sentiment
@@ -48,8 +50,10 @@ def change(sentiment, intensity):
         start_time = random.uniform(0, song_length / 2)
 
         if pygame.mixer.music.get_busy():
+            print("music playing")
             current_volume = pygame.mixer.music.get_volume()
 
+            print("fading music")
             for i in range(10, 0, -1):
                 pygame.mixer.music.set_volume(current_volume * (i / 10))
                 pygame.time.delay(50)
@@ -58,6 +62,7 @@ def change(sentiment, intensity):
         pygame.mixer.music.play(start=start_time)
         volume = intensity / 10.0
 
+        print("fade in new music")
         for i in range(0, 11):
             pygame.mixer.music.set_volume(current_volume * (i / 10))
             pygame.time.delay(50)
@@ -82,33 +87,3 @@ def queue():
                     current_song_name = next_song_name
         
         time.sleep(1)
-
-
-
-
-
-
-
-
-
-    song = pygame.mixer.Sound(song_path)
-    song_length = song.get_length()
-
-    start_time = random.randint(0, int(song_length - 1))
-
-    pygame.mixer.music.load(song_path)
-    pygame.mixer.music.play(start=start_time)
-
-    while pygame.mixer.music.get_busy():
-        pygame.time.Clock().tick(10)
-
-
-
-
-
-
-if __name__ == "__main__":
-    sentiments = ["driven","eerie","ethereal","melancholy","mysterious","neutral","tense","triumphant","upbeat"]
-    chosen_sentiment = random.choice(sentiments)
-    print(chosen_sentiment)
-    select_song(chosen_sentiment)

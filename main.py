@@ -7,86 +7,87 @@ import threading
 import time
 import os
 
-# constants
 READING_SPEED_WPM = 200
 WORDS_PER_SPREAD = 600
-OCR_INTERVAL = 2.5
+OCR_INTERVAL = 5
 CONTEXT_WINDOW_SIZE = 2000
 CONTEXT_WINDOW_THRESHOLD = 200
 
-# global vars
-last_ocr_location = None
-last_image_time = None
-curr_reading_loc_word_index = None
-last_check_time = None
-current_window_start = None
-current_window_end = None
-scheduled_music_changes = []  # list of (position, sentiment, intensity)
+last_ocr_location = 0
+last_image_time = time.time()
+curr_reading_loc_word_index = 0
+last_check_time = time.time() - 5
+current_window_start = 0
+current_window_end = 0
+scheduled_music_changes = []
 position_lock = threading.Lock()
 
-# clear quiz file
 with open("current_reading_session.txt", "w", encoding="utf-8") as f:
     f.write("")
-
+    print("quizfile cleared")
 
 def track_reading_pos():
     global last_ocr_location, last_image_time, curr_reading_loc_word_index, last_check_time
-
     while True:
         current_time = time.time()
 
         if current_time - last_check_time >= OCR_INTERVAL:
-            last_image_time = os.path.getmtime("image.jpg")
-
+            image_mtime = os.path.getmtime("image.jpg")
             preprocess.preprocess_image("image.jpg")
             ocr_text = ocr.get_image_text("processed_image.jpg")
-
             with position_lock:
                 if ocr_text:
-                    last_ocr_location = book.get_index(ocr_text)
+                    new_location = book.get_index(ocr_text, curr_reading_loc_word_index)
+                    
+                    if new_location > last_ocr_location + WORDS_PER_SPREAD - 100:
+                        last_ocr_location = new_location
+                        last_image_time = image_mtime
+                        print("got last ocr location")
                 else:
                     last_ocr_location += WORDS_PER_SPREAD
+                    print("appended to last ocr location")
 
-            last_check_time = current_time # update time of last check
-
+            last_check_time = current_time
         with position_lock:
-            elapsed_seconds = current_time - last_image_time # how long since image was sent
+            elapsed_seconds = current_time - last_image_time
             estimated_words = (READING_SPEED_WPM / 60) * elapsed_seconds
             curr_reading_loc_word_index = int(last_ocr_location + estimated_words)
-            print(f"Current position: {curr_reading_loc_word_index}")
+            print(f"current estimated reading position: {curr_reading_loc_word_index}")
+
         time.sleep(0.1)
 
 def schedule_play_music():
     global current_window_start, current_window_end, scheduled_music_changes
 
-    first_run = True # start with neutral if program just started
-
-    if first_run == True:
-        music.start_music()
-        first_run = False
+    music.start_music()
 
     while True:
         with position_lock:
             curr_pos = curr_reading_loc_word_index
-        
-        if current_window_end == None or curr_pos >= current_window_end - CONTEXT_WINDOW_THRESHOLD:
+
+        if current_window_end == 0 or curr_pos >= current_window_end - CONTEXT_WINDOW_THRESHOLD:
             context = book.get_context(curr_pos, CONTEXT_WINDOW_SIZE)
-        
-        with position_lock:
-            current_window_start = curr_pos
-            current_window_end = curr_pos + CONTEXT_WINDOW_SIZE
 
-        with open("current_reading_session.txt", "a", encoding="utf-8") as file:
-            file.write(context + "\n")
-        
-        sentiment_data = analyze.analyse_text(context)
+            print(curr_pos)
+            print("got new context" + context)
 
-        for entry in sentiment_data:
-            trigger_phrase, sentiment, intensity = entry
+            with position_lock:
+                current_window_start = curr_pos
+                current_window_end = curr_pos + CONTEXT_WINDOW_SIZE
 
-            trigger_pos = book.get_index(trigger_phrase)
+            with open("current_reading_session.txt", "a", encoding="utf-8") as file:
+                file.write(context + "\n")
+                print("wrote context to quizfile")
 
-            scheduled_music_changes.append((trigger_pos, sentiment, intensity))
+            with position_lock:
+                sentiment_data = analyze.analyse_text(context, curr_reading_loc_word_index)
+                print("getting sentiments")
+                scheduled_music_changes.clear()
+                scheduled_music_changes.append((0, "neutral", 5))
+
+            for entry in sentiment_data:
+                trigger_pos, _, sentiment, intensity = entry
+                scheduled_music_changes.append((trigger_pos, sentiment, intensity))
 
         for change in scheduled_music_changes[:]:
             position, sentiment, intensity = change
@@ -95,13 +96,25 @@ def schedule_play_music():
                 music.change(sentiment, intensity)
                 scheduled_music_changes.remove(change)
 
-            time.sleep(1)
-
-
+        time.sleep(1)
 
 position_thread = threading.Thread(target=track_reading_pos, daemon=True)
-music_thread = threading.Thread(target=schedule_play_music, daemon=True)
 position_thread.start()
+
+print("wait for first ocr to stabilise because no breaky please")
+while True:
+    with position_lock:
+        if curr_reading_loc_word_index > 20:
+            time.sleep(5)
+            break
+
+    time.sleep(5)
+
+music_thread = threading.Thread(target=schedule_play_music, daemon=True)
 music_thread.start()
-position_thread.join()
-music_thread.join()
+
+try:
+    while True:
+        time.sleep(1)
+except KeyboardInterrupt:
+    print("off")
