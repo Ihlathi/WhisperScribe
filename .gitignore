@@ -3,3 +3,4 @@ book.txt
 music/
 current_reading_session.txt
 processed_image.jpg
+__pycache__/
